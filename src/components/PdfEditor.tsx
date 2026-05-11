@@ -1,0 +1,597 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { Document, Page, pdfjs } from 'react-pdf';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Type, 
+  Download, 
+  ChevronLeft, 
+  ChevronRight, 
+  Settings2, 
+  Baseline, 
+  Bold, 
+  Palette,
+  X,
+  Trash2,
+  MousePointer,
+  RotateCcw,
+  Square,
+  Loader2,
+  Check,
+  Plus,
+  GripHorizontal,
+  Hand
+} from 'lucide-react';
+import Dropzone from './Dropzone';
+
+// High-reliability worker URL
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+interface Annotation {
+  id: string;
+  text: string;
+  x: number; // percentage (0-100)
+  y: number; // percentage (0-100)
+  pageIndex: number;
+  fontSize: number;
+  color: string;
+  bgColor: string | null;
+  isBold: boolean;
+}
+
+const COLORS = [
+  { name: 'Black', value: '#000000', rgb: [0, 0, 0] },
+  { name: 'Blue', value: '#1D4ED8', rgb: [0.11, 0.3, 0.85] },
+  { name: 'Red', value: '#DC2626', rgb: [0.86, 0.15, 0.15] },
+  { name: 'Green', value: '#059669', rgb: [0.02, 0.59, 0.41] },
+  { name: 'White', value: '#FFFFFF', rgb: [1, 1, 1] },
+];
+
+export default function PdfEditor() {
+  const [file, setFile] = useState<File | null>(null);
+  const [numPages, setNumPages] = useState<number>(0);
+  const [pageNumber, setPageNumber] = useState<number>(1);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeTool, setActiveTool] = useState<'text' | 'select'>('text');
+  
+  // Selection & Editing State
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+  
+  // Tool Inspector Defaults
+  const [currentFontSize, setCurrentFontSize] = useState(16);
+  const [currentTextColor, setCurrentTextColor] = useState(COLORS[0]);
+  const [currentBgColor, setCurrentBgColor] = useState<string | null>(null);
+  const [isBold, setIsBold] = useState(false);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (editingId && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [editingId]);
+
+  const onFilesAdded = (files: File[]) => {
+    if (files.length > 0) {
+      setIsLoading(true);
+      setFile(files[0]);
+      setAnnotations([]);
+      setPageNumber(1);
+    }
+  };
+
+  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+    setNumPages(numPages);
+    setIsLoading(false);
+  };
+
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    if (editingId) {
+      finishEditing();
+      return;
+    }
+
+    if (activeTool !== 'text' || !containerRef.current) return;
+    
+    const target = e.target as HTMLElement;
+    if (target.closest('.annotation-node') || target.closest('button')) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    const newId = Math.random().toString(36).substr(2, 9);
+    const newAnno: Annotation = {
+      id: newId,
+      text: '',
+      x,
+      y: y - 1, 
+      pageIndex: pageNumber - 1,
+      fontSize: currentFontSize,
+      color: currentTextColor.value,
+      bgColor: currentBgColor,
+      isBold: isBold
+    };
+
+    setAnnotations(prev => [...prev, newAnno]);
+    setEditingId(newId);
+    setEditingText('');
+  };
+
+  const finishEditing = () => {
+    if (!editingId) return;
+    
+    setAnnotations(prev => prev.map(a => {
+      if (a.id === editingId) {
+        return { ...a, text: editingText };
+      }
+      return a;
+    }).filter(a => a.text.trim() !== '' || a.id !== editingId));
+    
+    setEditingId(null);
+    setEditingText('');
+  };
+
+  const handleClose = () => {
+    setFile(null);
+    setAnnotations([]);
+    setPageNumber(1);
+    setEditingId(null);
+    setEditingText('');
+    setActiveTool('text');
+  };
+
+  const deleteAnnotation = (id: string) => {
+    setAnnotations(prev => prev.filter(a => a.id !== id));
+    if (editingId === id) {
+      setEditingId(null);
+      setEditingText('');
+    }
+  };
+
+  const handleDragEnd = (id: string, _: any, info: any) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    
+    // Use info.point (absolute coordinates) and convert to percentage relative to container
+    const newX = ((info.point.x - rect.left) / rect.width) * 100;
+    const newY = ((info.point.y - rect.top) / rect.height) * 100;
+    
+    setAnnotations(prev => prev.map(anno => {
+      if (anno.id === id) {
+        return { 
+          ...anno, 
+          x: Math.max(0, Math.min(95, newX)), 
+          y: Math.max(0, Math.min(98, newY)) 
+        };
+      }
+      return anno;
+    }));
+  };
+
+  const exportPdf = async () => {
+    if (!file) return;
+    setIsSaving(true);
+    finishEditing();
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(buffer);
+      const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const pages = pdfDoc.getPages();
+
+      for (const anno of annotations) {
+        if (!anno.text.trim()) continue;
+        
+        const page = pages[anno.pageIndex];
+        const { width, height } = page.getSize();
+        
+        const pdfX = (anno.x / 100) * width;
+        const pdfY = height - ((anno.y / 100) * height) - (anno.fontSize * 0.9);
+
+        const colorObj = COLORS.find(c => c.value === anno.color) || COLORS[0];
+        const [r, g, b]: any = colorObj.rgb;
+
+        if (anno.bgColor) {
+          const bgObj = COLORS.find(c => c.value === anno.bgColor);
+          if (bgObj) {
+            const [br, bg, bb]: any = bgObj.rgb;
+            const textWidth = (anno.isBold ? helveticaBold : helvetica).widthOfTextAtSize(anno.text, anno.fontSize);
+            page.drawRectangle({
+              x: pdfX - 4,
+              y: pdfY - 4,
+              width: textWidth + 8,
+              height: anno.fontSize + 8,
+              color: rgb(br, bg, bb),
+            });
+          }
+        }
+
+        page.drawText(anno.text, {
+          x: pdfX,
+          y: pdfY,
+          size: anno.fontSize,
+          font: anno.isBold ? helveticaBold : helvetica,
+          color: rgb(r, g, b),
+        });
+      }
+
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `architect_pro_${Date.now()}.pdf`;
+      link.click();
+    } catch (err) {
+      console.error('Export Error:', err);
+      alert('Export failed. This PDF might be protected or incompatible with high-precision injection.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto flex flex-col h-full gap-5 pb-10">
+      {/* Structural Header */}
+      <div className="flex flex-col md:flex-row justify-between items-center bg-white p-5 rounded-[2.5rem] border border-surface-border shadow-sm gap-5">
+        <div className="flex items-center gap-5">
+           <div className="w-12 h-12 bg-brand-accent rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-500/10">
+              <Plus className="w-6 h-6" />
+           </div>
+           <div>
+             <h2 className="text-xl font-bold text-brand-primary tracking-tight">PDF Architect Pro</h2>
+             <p className="text-[10px] font-black text-brand-secondary uppercase tracking-[0.2em]">Multi-Layer Precision Studio</p>
+           </div>
+        </div>
+
+        {file && (
+          <div className="flex items-center gap-3">
+             <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200">
+                <button 
+                  onClick={() => { finishEditing(); setActiveTool('text'); }}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black transition-all ${activeTool === 'text' ? 'bg-white text-brand-accent shadow-sm' : 'text-brand-secondary hover:text-brand-primary'}`}
+                >
+                  <Type className="w-4 h-4" /> ADD TEXT
+                </button>
+                <button 
+                  onClick={() => { finishEditing(); setActiveTool('select'); }}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black transition-all ${activeTool === 'select' ? 'bg-white text-brand-accent shadow-sm' : 'text-brand-secondary hover:text-brand-primary'}`}
+                >
+                  <MousePointer className="w-4 h-4" /> ARRANGE
+                </button>
+             </div>
+             
+             <div className="w-px h-8 bg-gray-200 mx-3 hidden md:block" />
+
+             <button
+              onClick={handleClose}
+              className="bg-white border border-red-100 text-red-500 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-red-50 transition-all active:scale-95"
+            >
+              Close Editor
+            </button>
+            <button
+              onClick={exportPdf}
+              disabled={isSaving || annotations.length === 0}
+              className="bg-brand-primary text-white px-8 py-2.5 rounded-xl text-xs font-bold shadow-xl shadow-black/10 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              SAVE AS PDF
+            </button>
+          </div>
+        )}
+      </div>
+
+      {!file ? (
+        <Dropzone 
+          onFilesAdded={onFilesAdded} 
+          accept={{ 'application/pdf': ['.pdf'] }}
+        />
+      ) : (
+        <div className="flex flex-col lg:flex-row gap-8 flex-1 min-h-0">
+          {/* Main Visual Editor */}
+          <div className="flex-1 bg-gray-50 rounded-[4rem] p-8 lg:p-14 overflow-auto flex flex-col items-center shadow-inner relative border border-gray-100">
+            {isLoading && (
+              <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-2xl flex flex-col items-center justify-center gap-6">
+                <Loader2 className="w-16 h-16 text-brand-accent animate-spin" />
+                <h3 className="text-xl font-bold text-brand-primary tracking-tight">Initializing Document Engine...</h3>
+              </div>
+            )}
+
+            <div 
+              ref={containerRef}
+              onClick={handleCanvasClick}
+              className={`relative bg-white shadow-2xl transition-all duration-500 ring-1 ring-black/5 ${activeTool === 'text' ? 'cursor-crosshair' : 'cursor-default'}`}
+              style={{ flexShrink: 0 }}
+            >
+              <Document file={file} onLoadSuccess={onDocumentLoadSuccess}>
+                <Page 
+                  pageNumber={pageNumber} 
+                  renderTextLayer={false} 
+                  renderAnnotationLayer={false}
+                  width={Math.min(window.innerWidth - 650, 850)}
+                />
+              </Document>
+
+              {/* Enhanced Annotation Overlay */}
+              <div className="absolute inset-0 pointer-events-none overflow-visible">
+                <AnimatePresence>
+                {annotations
+                  .filter(a => a.pageIndex === pageNumber - 1)
+                  .map(anno => (
+                    <motion.div
+                      key={anno.id}
+                      drag={activeTool === 'select' && !editingId}
+                      dragMomentum={false}
+                      onDragEnd={(e, info) => handleDragEnd(anno.id, e, info)}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className={`annotation-node absolute rounded-lg transition-all pointer-events-auto group ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing ring-2 ring-transparent hover:ring-brand-accent' : 'cursor-text'} ${editingId === anno.id ? 'z-[100]' : 'z-10'}`}
+                      style={{ 
+                        left: `${anno.x}%`, 
+                        top: `${anno.y}%`,
+                        fontSize: `clamp(10px, ${(anno.fontSize / 850) * 100}vw, 48px)`,
+                        color: anno.color,
+                        fontWeight: anno.isBold ? 'bold' : 'normal',
+                        backgroundColor: anno.bgColor || (editingId === anno.id ? 'white' : 'transparent'),
+                        padding: editingId === anno.id ? '12px' : '2px 4px',
+                        boxShadow: editingId === anno.id ? '0 40px 80px rgba(0,0,0,0.2)' : 'none'
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setEditingId(anno.id);
+                        setEditingText(anno.text);
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // In Arrange mode, we don't start editing on simple click to avoid collision with drag
+                        if (activeTool === 'select') return;
+                        if (editingId !== anno.id) {
+                          setEditingId(anno.id);
+                          setEditingText(anno.text);
+                        }
+                      }}
+                    >
+                      {editingId === anno.id ? (
+                        <div className="flex flex-col gap-3 min-w-[260px]">
+                           <textarea
+                            ref={inputRef}
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                finishEditing();
+                              }
+                            }}
+                            className="w-full bg-transparent border-none outline-none resize-none text-inherit font-black h-auto p-0 min-h-[3em]"
+                            placeholder="Type annotation..."
+                            autoFocus
+                          />
+                          <div className="flex justify-end gap-2 border-t border-gray-100 pt-3">
+                             <button 
+                               onClick={(e) => { e.stopPropagation(); finishEditing(); }}
+                               className="px-4 py-1.5 bg-brand-accent text-white rounded-xl text-[9px] font-black tracking-widest uppercase hover:bg-brand-primary active:scale-95 transition-all"
+                             >
+                               Save Label
+                             </button>
+                             <button 
+                               onClick={(e) => { e.stopPropagation(); deleteAnnotation(anno.id); }}
+                               className="px-4 py-1.5 bg-red-50 text-red-500 rounded-xl text-[9px] font-black tracking-widest uppercase hover:bg-red-500 hover:text-white active:scale-95 transition-all"
+                             >
+                               Remove
+                             </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <span className="whitespace-pre-wrap">{anno.text || 'Untitled Note'}</span>
+                          
+                          {/* Arrange Mode Toolset */}
+                          {activeTool === 'select' && (
+                            <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all pointer-events-none scale-90 group-hover:scale-100">
+                               <div className="bg-brand-primary text-white text-[9px] font-black px-3 py-1.5 rounded-full whitespace-nowrap shadow-2xl uppercase tracking-[0.2em] flex items-center gap-2">
+                                  <Hand className="w-3.5 h-3.5" /> Drag Any Direction
+                               </div>
+                               <button 
+                                  onClick={(e) => { e.stopPropagation(); setEditingId(anno.id); setEditingText(anno.text); }}
+                                  className="pointer-events-auto bg-brand-accent text-white p-2 rounded-full shadow-lg hover:scale-110 active:scale-90 transition-all"
+                               >
+                                  <Type className="w-4 h-4" />
+                               </button>
+                               <button 
+                                  onClick={(e) => { e.stopPropagation(); deleteAnnotation(anno.id); }}
+                                  className="pointer-events-auto bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-700 active:scale-90 transition-all"
+                               >
+                                  <Trash2 className="w-4 h-4" />
+                               </button>
+                            </div>
+                          )}
+                          
+                          {activeTool === 'text' && (
+                             <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-accent text-white text-[9px] font-black px-3 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap uppercase tracking-widest pointer-events-none">
+                               Click to Edit
+                             </div>
+                          )}
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+
+              {activeTool === 'text' && !editingId && (
+                <div className="absolute top-10 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-2xl px-10 py-4 rounded-full text-white text-[10px] font-black uppercase tracking-[0.4em] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-2xl border border-white/20">
+                  Select Text Area on Page
+                </div>
+              )}
+            </div>
+
+            {/* Navigation Deck */}
+            <div className="mt-12 flex items-center gap-5 bg-white/90 backdrop-blur-2xl px-12 py-5 rounded-full border border-gray-100 shadow-2xl animate-in fade-in slide-in-from-bottom-5 duration-700">
+              <button 
+                disabled={pageNumber <= 1}
+                onClick={() => { finishEditing(); setPageNumber(p => p - 1); }}
+                className="p-3 transition-all hover:bg-gray-100 rounded-full disabled:opacity-10 active:scale-90"
+              >
+                <ChevronLeft className="w-10 h-10 text-brand-primary" />
+              </button>
+              <div className="text-center px-12 border-x border-gray-100">
+                <p className="text-3xl font-black text-brand-primary leading-none mb-1 tracking-tighter">
+                  {pageNumber} <span className="text-gray-300 mx-2">/</span> {numPages}
+                </p>
+                <p className="font-black text-[11px] text-brand-secondary uppercase tracking-[0.25em]">Document Page</p>
+              </div>
+              <button 
+                disabled={pageNumber >= numPages}
+                onClick={() => { finishEditing(); setPageNumber(p => p + 1); }}
+                className="p-3 transition-all hover:bg-gray-100 rounded-full disabled:opacity-10 active:scale-90"
+              >
+                <ChevronRight className="w-10 h-10 text-brand-primary" />
+              </button>
+            </div>
+          </div>
+
+          {/* Right Control Hub */}
+          <div className="w-full lg:w-96 flex flex-col gap-6">
+            <div className="bg-white p-8 rounded-[3.5rem] border border-surface-border shadow-sm space-y-10">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-[11px] uppercase tracking-[0.3em] text-brand-secondary">Tool Settings</h3>
+                <Settings2 className="w-4 h-4 text-brand-secondary" />
+              </div>
+              
+              <div className="space-y-10">
+                {/* Size Deck */}
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-brand-secondary uppercase tracking-widest flex items-center gap-2">
+                     <Baseline className="w-4 h-4" /> Font Size: {currentFontSize}pt
+                  </label>
+                  <div className="grid grid-cols-4 gap-3">
+                    {[12, 18, 24, 38].map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setCurrentFontSize(s)}
+                        className={`py-4 rounded-3xl text-[11px] font-black transition-all border-2 ${currentFontSize === s ? 'bg-brand-primary text-white border-brand-primary shadow-xl' : 'bg-gray-50 border-transparent text-gray-400 hover:bg-gray-100'}`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => setIsBold(!isBold)}
+                  className={`w-full flex items-center justify-center gap-4 p-5 rounded-[2.5rem] text-xs font-black border-2 transition-all ${isBold ? 'bg-brand-accent text-white border-brand-accent shadow-2xl shadow-blue-500/20' : 'bg-white border-gray-100 text-brand-secondary'}`}
+                >
+                  <Bold className="w-6 h-6" /> BOLD TYPOGRAPHY
+                </button>
+
+                {/* Color Deck */}
+                <div className="space-y-4">
+                   <label className="text-[10px] font-black text-brand-secondary uppercase tracking-widest flex items-center gap-2">
+                    <Palette className="w-4 h-4" /> Color Palette
+                  </label>
+                  <div className="flex justify-between p-3 bg-gray-50 rounded-[2.5rem] border border-gray-100 box-content">
+                    {COLORS.slice(0, 4).map(c => (
+                      <button
+                        key={c.value}
+                        onClick={() => setCurrentTextColor(c)}
+                        className={`w-14 h-14 rounded-2xl border-4 transition-all hover:scale-110 active:scale-95 ${currentTextColor.value === c.value ? 'border-white ring-2 ring-brand-accent shadow-2xl' : 'border-transparent opacity-40 hover:opacity-100'}`}
+                        style={{ backgroundColor: c.value }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Whiteout / BG Deck */}
+                <div className="space-y-4">
+                   <label className="text-[10px] font-black text-brand-secondary uppercase tracking-widest flex items-center gap-2">
+                    <Square className="w-4 h-4" /> Backdrop Layer
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={() => setCurrentBgColor(null)}
+                      className={`py-5 rounded-[2rem] text-[10px] font-black transition-all border-2 ${currentBgColor === null ? 'bg-brand-primary text-white border-brand-primary shadow-lg' : 'bg-white border-gray-100 text-gray-400 hover:bg-gray-50'}`}
+                    >
+                      NATURAL
+                    </button>
+                    <button
+                      onClick={() => setCurrentBgColor('#FFFFFF')}
+                      className={`py-5 rounded-[2rem] text-[10px] font-black transition-all border-2 ${currentBgColor === '#FFFFFF' ? 'bg-white text-brand-primary border-brand-primary shadow-2xl' : 'bg-white border-gray-100 text-gray-400 hover:bg-gray-50'}`}
+                    >
+                      WHITEOUT (REDACT)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Layer Tree */}
+            <div className="bg-white p-8 rounded-[3.5rem] border border-surface-border shadow-sm flex-1 flex flex-col min-h-0">
+               <h3 className="font-black text-[11px] uppercase tracking-[0.3em] text-brand-secondary mb-8 flex items-center justify-between">
+                Project Layers
+                <span className="bg-gray-50 px-4 py-1.5 rounded-full text-[11px] font-mono border border-gray-100 shadow-inner">{annotations.length}</span>
+              </h3>
+              
+              <div className="space-y-4 overflow-y-auto flex-1 pr-1 custom-scrollbar">
+                {annotations.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center opacity-20 grayscale py-20 text-center">
+                     <Plus className="w-16 h-16 mb-6 text-brand-secondary" />
+                     <p className="text-[12px] font-black uppercase tracking-[0.2em] text-brand-secondary">Workspace Empty</p>
+                     <p className="text-[10px] mt-3 font-medium text-brand-secondary leading-relaxed">Begin clicking on document<br/>to place your annotations.</p>
+                  </div>
+                ) : (
+                  annotations.map(anno => (
+                    <div 
+                      key={anno.id} 
+                      className={`p-6 rounded-[2.5rem] border transition-all flex items-center gap-5 group cursor-pointer ${anno.pageIndex === pageNumber - 1 ? 'bg-blue-50 border-blue-100 shadow-sm' : 'bg-white border-transparent opacity-40 grayscale hover:opacity-70'}`}
+                      onClick={() => {
+                        if (anno.pageIndex !== pageNumber - 1) {
+                          setPageNumber(anno.pageIndex + 1);
+                        }
+                        setEditingId(anno.id);
+                        setEditingText(anno.text);
+                      }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-black text-brand-primary truncate leading-tight uppercase tracking-tight">{anno.text || 'Draft Annotation'}</p>
+                        <div className="flex items-center gap-3 mt-2">
+                           <span className="text-[9px] font-black uppercase text-gray-400">Sheet {anno.pageIndex + 1}</span>
+                           <span className="text-[9px] font-black uppercase text-gray-400">•</span>
+                           <span className="text-[9px] font-black uppercase text-gray-400">{anno.fontSize}pt</span>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteAnnotation(anno.id);
+                        }}
+                        className="p-3 bg-white text-red-500 hover:bg-red-500 hover:text-white rounded-2xl transition-all shadow-sm border border-gray-100"
+                      >
+                        <Trash2 className="w-5 h-5 pointer-events-none" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+               {annotations.length > 0 && (
+                 <button 
+                  onClick={() => { if(confirm("Discard all mult-layer architectural progress?")) setAnnotations([]); }}
+                  className="mt-8 w-full py-6 text-[11px] font-black text-red-500 hover:bg-red-50 rounded-[3.5rem] transition-all flex items-center justify-center gap-4 border-2 border-dashed border-red-100 group"
+                >
+                  <RotateCcw className="w-5 h-5 group-hover:rotate-180 transition-transform duration-700" /> RESET WORKSPACE
+                </button>
+               )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

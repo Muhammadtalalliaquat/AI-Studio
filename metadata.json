@@ -1,0 +1,6 @@
+{
+  "name": "AI PDF Studio",
+  "description": "Professional AI-powered PDF platform to convert images to PDF, edit existing PDFs, and use AI to analyze or generate content.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["AI PDF Editing", "Image to PDF Conversion", "AI Document Analysis"]
+}
