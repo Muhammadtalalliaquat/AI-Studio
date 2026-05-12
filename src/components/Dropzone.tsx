@@ -27,7 +27,7 @@ export default function Dropzone({ onFilesAdded, accept, maxFiles = 10, label = 
       {...getRootProps()}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`relative group cursor-pointer border-2 border-dashed rounded-2xl p-12 transition-all duration-300 text-center
+      className={`relative group cursor-pointer border-2 border-dashed rounded-2xl p-6 md:p-12 transition-all duration-300 text-center
         ${isDragActive ? 'border-brand-accent bg-blue-50' : 'border-surface-border hover:border-brand-secondary bg-white'}`}
     >
       <input {...getInputProps()} />
