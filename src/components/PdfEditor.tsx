@@ -37,7 +37,14 @@ interface Annotation {
   color: string;
   bgColor: string | null;
   isBold: boolean;
+  fontFamily: string;
 }
+
+const FONTS = [
+  { name: 'Modern Sans', value: 'Helvetica', css: '"Inter", sans-serif' },
+  { name: 'Classic Serif', value: 'TimesRoman', css: '"Times New Roman", serif' },
+  { name: 'Precision Mono', value: 'Courier', css: '"JetBrains Mono", monospace' },
+];
 
 const COLORS = [
   { name: 'Black', value: '#000000', rgb: [0, 0, 0] },
@@ -65,6 +72,7 @@ export default function PdfEditor() {
   const [currentFontSize, setCurrentFontSize] = useState(16);
   const [currentTextColor, setCurrentTextColor] = useState(COLORS[0]);
   const [currentBgColor, setCurrentBgColor] = useState<string | null>(null);
+  const [currentFont, setCurrentFont] = useState(FONTS[0]);
   const [isBold, setIsBold] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -84,6 +92,41 @@ export default function PdfEditor() {
     resizeObserver.observe(editorParentRef.current);
     return () => resizeObserver.disconnect();
   }, []);
+
+  // Sync Settings to selected annotation
+  useEffect(() => {
+    if (editingId) {
+      const activeAnno = annotations.find(a => a.id === editingId);
+      if (activeAnno) {
+        setCurrentFontSize(activeAnno.fontSize);
+        const colorObj = COLORS.find(c => c.value === activeAnno.color);
+        if (colorObj) setCurrentTextColor(colorObj);
+        setCurrentBgColor(activeAnno.bgColor);
+        setIsBold(activeAnno.isBold);
+        const fontObj = FONTS.find(f => f.value === activeAnno.fontFamily);
+        if (fontObj) setCurrentFont(fontObj);
+      }
+    }
+  }, [editingId]);
+
+  // Update selected annotation when settings change
+  useEffect(() => {
+    if (editingId) {
+      setAnnotations(prev => prev.map(a => {
+        if (a.id === editingId) {
+          return {
+            ...a,
+            fontSize: currentFontSize,
+            color: currentTextColor.value,
+            bgColor: currentBgColor,
+            isBold: isBold,
+            fontFamily: currentFont.value
+          };
+        }
+        return a;
+      }));
+    }
+  }, [currentFontSize, currentTextColor, currentBgColor, isBold, currentFont, editingId]);
 
   useEffect(() => {
     if (editingId && inputRef.current) {
@@ -130,7 +173,8 @@ export default function PdfEditor() {
       fontSize: currentFontSize,
       color: currentTextColor.value,
       bgColor: currentBgColor,
-      isBold: isBold
+      isBold: isBold,
+      fontFamily: currentFont.value
     };
 
     setAnnotations(prev => [...prev, newAnno]);
@@ -197,8 +241,17 @@ export default function PdfEditor() {
     try {
       const buffer = await file.arrayBuffer();
       const pdfDoc = await PDFDocument.load(buffer);
-      const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      
+      // Embed all possible fonts to avoid repeated embedding
+      const fonts: Record<string, any> = {
+        'Helvetica': await pdfDoc.embedFont(StandardFonts.Helvetica),
+        'Helvetica-Bold': await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+        'Courier': await pdfDoc.embedFont(StandardFonts.Courier),
+        'Courier-Bold': await pdfDoc.embedFont(StandardFonts.CourierBold),
+        'TimesRoman': await pdfDoc.embedFont(StandardFonts.TimesRoman),
+        'TimesRoman-Bold': await pdfDoc.embedFont(StandardFonts.TimesRomanBold),
+      };
+
       const pages = pdfDoc.getPages();
 
       for (const anno of annotations) {
@@ -213,11 +266,14 @@ export default function PdfEditor() {
         const colorObj = COLORS.find(c => c.value === anno.color) || COLORS[0];
         const [r, g, b]: any = colorObj.rgb;
 
+        const fontKey = anno.isBold ? `${anno.fontFamily}-Bold` : anno.fontFamily;
+        const selectedFont = fonts[fontKey] || fonts['Helvetica'];
+
         if (anno.bgColor) {
           const bgObj = COLORS.find(c => c.value === anno.bgColor);
           if (bgObj) {
             const [br, bg, bb]: any = bgObj.rgb;
-            const textWidth = (anno.isBold ? helveticaBold : helvetica).widthOfTextAtSize(anno.text, anno.fontSize);
+            const textWidth = selectedFont.widthOfTextAtSize(anno.text, anno.fontSize);
             page.drawRectangle({
               x: pdfX - 4,
               y: pdfY - 4,
@@ -232,7 +288,7 @@ export default function PdfEditor() {
           x: pdfX,
           y: pdfY,
           size: anno.fontSize,
-          font: anno.isBold ? helveticaBold : helvetica,
+          font: selectedFont,
           color: rgb(r, g, b),
         });
       }
@@ -358,6 +414,7 @@ export default function PdfEditor() {
                         top: `${anno.y}%`,
                         fontSize: (anno.fontSize * (containerWidth / 850)),
                         color: anno.color,
+                        fontFamily: (FONTS.find(f => f.value === anno.fontFamily) || FONTS[0]).css,
                         fontWeight: anno.isBold ? 'bold' : 'normal',
                         backgroundColor: anno.bgColor || (editingId === anno.id ? 'white' : 'transparent'),
                         padding: editingId === anno.id ? '12px' : '2px 4px',
@@ -487,6 +544,26 @@ export default function PdfEditor() {
               </div>
               
               <div className="space-y-8 md:space-y-10">
+                {/* Font Deck */}
+                <div className="space-y-3 md:space-y-4">
+                  <label className="text-[9px] md:text-[10px] font-black text-brand-secondary uppercase tracking-widest flex items-center gap-2">
+                     <Type className="w-4 h-4" /> Typography Style
+                  </label>
+                  <div className="flex flex-col gap-2">
+                    {FONTS.map(f => (
+                      <button
+                        key={f.value}
+                        onClick={() => setCurrentFont(f)}
+                        className={`w-full px-5 py-3 rounded-2xl text-[11px] font-black transition-all border-2 text-left flex items-center justify-between ${currentFont.value === f.value ? 'bg-brand-primary text-white border-brand-primary shadow-lg' : 'bg-gray-50 border-transparent text-gray-400 hover:bg-gray-100'}`}
+                        style={{ fontFamily: f.css }}
+                      >
+                        {f.name}
+                        {currentFont.value === f.value && <Check className="w-4 h-4" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Size Deck */}
                 <div className="space-y-3 md:space-y-4">
                   <label className="text-[9px] md:text-[10px] font-black text-brand-secondary uppercase tracking-widest flex items-center gap-2">
