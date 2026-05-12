@@ -1,13 +1,14 @@
-import { FileImage, FileText, Sparkles, LayoutDashboard } from 'lucide-react';
+import { FileImage, FileText, Sparkles, LayoutDashboard, X } from 'lucide-react';
 import { AppView } from '../types';
 import { motion } from 'motion/react';
 
 interface SidebarProps {
   currentView: AppView;
   onViewChange: (view: AppView) => void;
+  onClose?: () => void;
 }
 
-export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
+export default function Sidebar({ currentView, onViewChange, onClose }: SidebarProps) {
   const items = [
     { id: 'convert' as AppView, icon: FileImage, label: 'Image to PDF' },
     { id: 'edit' as AppView, icon: FileText, label: 'Edit PDF' },
@@ -15,12 +16,22 @@ export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
   ];
 
   return (
-    <div className="w-64 border-r border-surface-border bg-white flex flex-col h-screen sticky top-0 shrink-0">
-      <div className="p-6 flex items-center gap-3">
-        <div className="bg-brand-accent p-2 rounded-lg">
-          <LayoutDashboard className="text-white w-6 h-6" />
+    <div className="w-72 border-r border-surface-border bg-white flex flex-col h-screen sticky top-0 shrink-0 shadow-2xl lg:shadow-none">
+      <div className="p-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="bg-brand-accent p-2 rounded-lg">
+            <LayoutDashboard className="text-white w-6 h-6" />
+          </div>
+          <h1 className="font-bold text-xl tracking-tight">AI Studio</h1>
         </div>
-        <h1 className="font-bold text-xl tracking-tight">AI Studio</h1>
+        {onClose && (
+          <button 
+            onClick={onClose}
+            className="lg:hidden p-2 hover:bg-gray-100 rounded-xl transition-colors"
+          >
+            <X className="w-6 h-6 text-brand-secondary" />
+          </button>
+        )}
       </div>
 
       <nav className="flex-1 px-4 py-4 space-y-2">

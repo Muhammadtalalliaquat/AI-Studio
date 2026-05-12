@@ -16,8 +16,12 @@ import {
   Square,
   Loader2,
   Check,
+  Menu,
+  X,
   Plus,
-  Hand
+  Hand,
+  Monitor,
+  LayoutGrid
 } from 'lucide-react';
 import Dropzone from './Dropzone';
 
@@ -64,6 +68,7 @@ export default function PdfEditor() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
   const [containerWidth, setContainerWidth] = useState(800);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Tool Inspector Defaults
   const [currentFontSize, setCurrentFontSize] = useState(16);
@@ -306,81 +311,100 @@ export default function PdfEditor() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto flex flex-col h-full gap-4 md:gap-5 pb-6 md:pb-10 px-4 md:px-0">
-      {/* Structural Header */}
-      <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 md:p-5 rounded-3xl md:rounded-[2.5rem] border border-surface-border shadow-sm gap-4 md:gap-5 mt-4 md:mt-0">
-        <div className="flex items-center gap-4 md:gap-5 w-full md:w-auto">
-           <div className="w-10 h-10 md:w-12 md:h-12 bg-brand-accent rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-500/10 shrink-0">
-              <Plus className="w-5 h-5 md:w-6 md:h-6" />
+    <div className="max-w-7xl mx-auto flex flex-col h-[100dvh] lg:h-full gap-4 md:gap-6 pb-4 md:pb-10 lg:pt-0 px-0 md:px-0 relative">
+      {/* Structural Header - Adjusted for Mobile Layout */}
+      <div className="flex items-center justify-between bg-white/80 backdrop-blur-xl p-4 md:p-6 rounded-none lg:rounded-[3rem] border-b lg:border border-surface-border shadow-sm gap-4 shrink-0 z-50">
+        <div className="flex items-center gap-3 md:gap-5 min-w-0">
+           <div className="w-9 h-9 md:w-14 md:h-14 bg-brand-primary rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-2xl shadow-brand-primary/20 shrink-0">
+              <Plus className="w-5 h-5 md:w-8 md:h-8" />
            </div>
            <div className="min-w-0">
-             <h2 className="text-lg md:text-xl font-bold text-brand-primary tracking-tight truncate">PDF Architect Pro</h2>
-             <p className="text-[8px] md:text-[10px] font-black text-brand-secondary uppercase tracking-[0.2em] truncate">Multi-Layer Precision Studio</p>
+             <h2 className="text-sm md:text-2xl font-black text-brand-primary tracking-tighter truncate uppercase leading-none">Architect Pro</h2>
+             <p className="text-[6px] md:text-[10px] font-black text-brand-secondary/40 uppercase tracking-[0.3em] truncate mt-1">Industrial Document Engine</p>
            </div>
         </div>
 
-        {file && (
-          <div className="flex flex-wrap items-center justify-center md:justify-end gap-2 md:gap-3 w-full md:w-auto">
-             <div className="flex bg-gray-100 p-1 rounded-xl md:rounded-2xl border border-gray-200">
-                <button 
-                  onClick={() => { finishEditing(); setActiveTool('text'); }}
-                  className={`flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black transition-all ${activeTool === 'text' ? 'bg-white text-brand-accent shadow-sm' : 'text-brand-secondary hover:text-brand-primary'}`}
-                >
-                  <Type className="w-3.5 h-3.5 md:w-4 md:h-4" /> <span className="hidden sm:inline">ADD</span> TEXT
-                </button>
-                <button 
-                  onClick={() => { finishEditing(); setActiveTool('select'); }}
-                  className={`flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black transition-all ${activeTool === 'select' ? 'bg-white text-brand-accent shadow-sm' : 'text-brand-secondary hover:text-brand-primary'}`}
-                >
-                  <MousePointer className="w-3.5 h-3.5 md:w-4 md:h-4" /> <span className="hidden sm:inline">ARRANGE</span>
-                </button>
-             </div>
-             
-             <div className="w-px h-6 md:h-8 bg-gray-200 mx-1 md:mx-3 hidden sm:block" />
-
-             <div className="flex gap-2">
-               <button
-                onClick={handleClose}
-                className="bg-white border border-red-100 text-red-500 px-3 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl text-[10px] md:text-xs font-bold hover:bg-red-50 transition-all active:scale-95"
+        <div className="flex items-center gap-2 md:gap-4">
+          {file && (
+            <>
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="lg:hidden bg-brand-accent/10 text-brand-accent p-2.5 rounded-xl border border-brand-accent/20"
               >
-                Close
+                <Settings2 className="w-5 h-5" />
               </button>
               <button
                 onClick={exportPdf}
                 disabled={isSaving || annotations.length === 0}
-                className="bg-brand-primary text-white px-4 md:px-8 py-2 md:py-2.5 rounded-lg md:rounded-xl text-[10px] md:text-xs font-bold shadow-xl shadow-black/10 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-50"
+                className="bg-brand-accent text-white px-4 md:px-10 py-2.5 md:py-4 rounded-xl md:rounded-2xl text-[10px] md:text-sm font-black shadow-2xl shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-50 uppercase tracking-widest"
               >
                 {isSaving ? <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> : <Download className="w-3 h-3 md:w-4 md:h-4" />}
-                <span className="hidden sm:inline">SAVE AS</span> PDF
+                <span className="hidden sm:inline">Export</span> PDF
               </button>
-             </div>
-          </div>
-        )}
+            </>
+          )}
+          <button
+            onClick={handleClose}
+            className="bg-gray-50 text-gray-400 p-2.5 md:p-4 rounded-xl md:rounded-2xl hover:bg-red-50 hover:text-red-500 transition-all border border-transparent hover:border-red-100"
+          >
+            <Trash2 className="w-4 h-4 md:w-6 md:h-6" />
+          </button>
+        </div>
       </div>
 
       {!file ? (
-        <Dropzone 
-          onFilesAdded={onFilesAdded} 
-          accept={{ 'application/pdf': ['.pdf'] }}
-        />
+        <div className="flex-1 flex flex-col justify-center max-w-4xl mx-auto w-full">
+           <div className="mb-8 text-center space-y-3">
+              <h1 className="text-3xl md:text-5xl font-black text-brand-primary tracking-tighter uppercase">Document Injection Studio</h1>
+              <p className="text-xs md:text-sm font-black text-brand-secondary/40 uppercase tracking-[0.4em]">High Precision PDF Annotation Engine</p>
+           </div>
+          <Dropzone 
+            onFilesAdded={onFilesAdded} 
+            accept={{ 'application/pdf': ['.pdf'] }}
+          />
+        </div>
       ) : (
-        <div className="flex flex-col lg:flex-row gap-6 md:gap-8 flex-1 min-h-0">
+        <div className="flex flex-col lg:flex-row gap-6 md:gap-8 flex-1 min-h-0 relative">
           {/* Main Visual Editor */}
           <div 
             ref={editorParentRef}
-            className="flex-1 bg-gray-50 rounded-3xl md:rounded-[4rem] p-4 md:p-8 lg:p-14 overflow-auto flex flex-col items-center shadow-inner relative border border-gray-100"
+            className="flex-1 bg-gray-50 rounded-3xl md:rounded-[4rem] p-4 md:p-10 lg:p-16 overflow-auto flex flex-col items-center shadow-inner relative border border-gray-100/50"
           >
+            {/* Tool Toggle (Floating on Canvas) */}
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[40] flex bg-black/5 backdrop-blur-2xl p-1.5 rounded-[2rem] border border-black/5 shadow-2xl">
+                <button 
+                  onClick={() => { finishEditing(); setActiveTool('text'); }}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-full text-[10px] font-black transition-all ${activeTool === 'text' ? 'bg-brand-primary text-white shadow-xl' : 'text-brand-primary hover:bg-white/50'}`}
+                >
+                  <Type className="w-4 h-4" /> ADD TEXT
+                </button>
+                <button 
+                  onClick={() => { finishEditing(); setActiveTool('select'); }}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-full text-[10px] font-black transition-all ${activeTool === 'select' ? 'bg-brand-primary text-white shadow-xl' : 'text-brand-primary hover:bg-white/50'}`}
+                >
+                  <MousePointer className="w-4 h-4" /> ARRANGE
+                </button>
+            </div>
+
             {isLoading && (
-              <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-2xl flex flex-col items-center justify-center gap-6">
-                <Loader2 className="w-12 h-12 md:w-16 md:h-16 text-brand-accent animate-spin" />
-                <h3 className="text-lg md:text-xl font-bold text-brand-primary tracking-tight text-center px-4">Initializing Document Engine...</h3>
+              <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-2xl flex flex-col items-center justify-center gap-8">
+                <div className="relative">
+                  <Loader2 className="w-20 h-20 text-brand-primary animate-spin" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                     <Plus className="w-8 h-8 text-brand-accent animate-pulse" />
+                  </div>
+                </div>
+                <div className="text-center space-y-2">
+                  <h3 className="text-xl font-black text-brand-primary tracking-tighter uppercase">Initializing Engine</h3>
+                  <p className="text-[10px] font-black text-brand-secondary/40 uppercase tracking-[0.4em]">Calibrating document space...</p>
+                </div>
               </div>
             )}
 
             <div 
               ref={containerRef}
               onClick={handleCanvasClick}
-              className={`relative bg-white shadow-2xl transition-all duration-500 ring-1 ring-black/5 ${activeTool === 'text' ? 'cursor-crosshair' : 'cursor-default'}`}
+              className={`relative bg-white shadow-[0_100px_100px_-50px_rgba(0,0,0,0.15)] transition-all duration-700 ring-[12px] ring-white rounded-md border border-gray-200/50 ${activeTool === 'text' ? 'cursor-crosshair' : 'cursor-default'}`}
               style={{ flexShrink: 0 }}
             >
               <Document file={file} onLoadSuccess={onDocumentLoadSuccess}>
@@ -532,12 +556,50 @@ export default function PdfEditor() {
             </div>
           </div>
 
-          {/* Right Control Hub */}
-          <div className="w-full lg:w-96 flex flex-col gap-4 md:gap-6">
-            <div className="bg-white p-6 md:p-8 rounded-3xl md:rounded-[3.5rem] border border-surface-border shadow-sm space-y-8 md:space-y-10">
-              <div className="flex items-center justify-between">
-                <h3 className="font-black text-[10px] md:text-[11px] uppercase tracking-[0.3em] text-brand-secondary">Tool Settings</h3>
-                <Settings2 className="w-4 h-4 text-brand-secondary" />
+          {/* Right Control Hub - Desktop Sidebar & Mobile Drawer */}
+          <AnimatePresence>
+            {isSidebarOpen && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsSidebarOpen(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] lg:hidden"
+              />
+            )}
+          </AnimatePresence>
+
+          <div className={`
+            fixed lg:relative inset-y-0 right-0 w-[85%] sm:w-[420px] lg:w-[420px] 
+            bg-white lg:bg-transparent z-[101] lg:z-10
+            transform transition-transform duration-500 ease-in-out
+            ${isSidebarOpen ? 'translate-x-0 shadow-[-50px_0_100px_rgba(0,0,0,0.2)]' : 'translate-x-full lg:translate-x-0'}
+            flex flex-col gap-4 md:gap-6 lg:overflow-y-auto lg:pr-2 custom-scrollbar p-6 lg:p-0
+          `}>
+            <div className="flex lg:hidden items-center justify-between mb-6">
+               <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-brand-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand-primary/20">
+                    <Monitor className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-black text-xs uppercase tracking-widest text-brand-primary">Control Desk</h3>
+               </div>
+               <button 
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="p-3 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200"
+               >
+                  <X className="w-5 h-5" />
+               </button>
+            </div>
+
+            <div className="bg-white p-6 md:p-10 rounded-3xl md:rounded-[3.5rem] border border-surface-border shadow-sm space-y-10">
+              <div className="flex items-center justify-between border-b border-gray-50 pb-6">
+                <div>
+                  <h3 className="font-black text-[12px] uppercase tracking-[0.4em] text-brand-primary">Module Settings</h3>
+                  <p className="text-[9px] font-black text-brand-secondary/40 uppercase tracking-widest mt-1">Configure active injector</p>
+                </div>
+                <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-brand-secondary">
+                  <Settings2 className="w-5 h-5" />
+                </div>
               </div>
               
               <div className="space-y-8 md:space-y-10">
@@ -604,28 +666,27 @@ export default function PdfEditor() {
                 </div>
 
                 {/* Whiteout / BG Deck */}
-                <div className="space-y-3 md:space-y-4">
-                   <label className="text-[9px] md:text-[10px] font-black text-brand-secondary uppercase tracking-widest flex items-center gap-2">
-                    <Square className="w-4 h-4" /> Backdrop Layer
+                <div className="space-y-4">
+                   <label className="text-[10px] font-black text-brand-primary uppercase tracking-[0.2em] flex items-center gap-2">
+                    <Square className="w-4 h-4 text-brand-accent" /> BACKDROP LAYER
                   </label>
-                  <div className="grid grid-cols-2 gap-3 md:gap-4">
+                  <div className="grid grid-cols-2 gap-3 p-1.5 bg-gray-50 rounded-2xl border border-gray-100">
                     <button
                       onClick={() => setCurrentBgColor(null)}
-                      className={`py-4 md:py-5 rounded-2xl md:rounded-[2rem] text-[9px] md:text-[10px] font-black transition-all border-2 ${currentBgColor === null ? 'bg-brand-primary text-white border-brand-primary shadow-lg' : 'bg-white border-gray-100 text-gray-400 hover:bg-gray-50'}`}
+                      className={`py-4 rounded-xl text-[10px] font-black transition-all border-2 uppercase tracking-widest ${currentBgColor === null ? 'bg-white text-brand-primary border-transparent shadow-xl' : 'bg-transparent border-transparent text-gray-400 hover:bg-gray-100/50'}`}
                     >
                       NATURAL
                     </button>
                     <button
                       onClick={() => setCurrentBgColor('#FFFFFF')}
-                      className={`py-4 md:py-5 rounded-2xl md:rounded-[2rem] text-[9px] md:text-[10px] font-black transition-all border-2 ${currentBgColor === '#FFFFFF' ? 'bg-white text-brand-primary border-brand-primary shadow-2xl' : 'bg-white border-gray-100 text-gray-400 hover:bg-gray-50'}`}
+                      className={`py-4 rounded-xl text-[10px] font-black transition-all border-2 uppercase tracking-widest ${currentBgColor === '#FFFFFF' ? 'bg-white text-brand-primary border-transparent shadow-xl' : 'bg-transparent border-transparent text-gray-400 hover:bg-gray-100/50'}`}
                     >
-                      WHITEOUT (REDACT)
+                      WHITEOUT
                     </button>
                   </div>
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       )}

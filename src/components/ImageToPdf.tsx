@@ -153,7 +153,7 @@ export default function ImageToPdf() {
           label="Drop images to convert"
         />
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
           <AnimatePresence mode="popLayout">
             {images.map((img, idx) => (
               <motion.div
@@ -161,33 +161,31 @@ export default function ImageToPdf() {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="relative group aspect-[3/4] bg-white rounded-2xl overflow-hidden border border-surface-border shadow-sm"
+                className="relative group aspect-[3/4] bg-white rounded-3xl overflow-hidden shadow-sm ring-1 ring-gray-200"
               >
                 <img src={img.preview} className="w-full h-full object-cover" alt={`preview-${idx}`} />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 backdrop-blur-[2px]">
                   <button 
                     onClick={() => removeImage(idx)}
-                    className="p-2 bg-red-500 text-white rounded-lg hover:scale-110 transition-transform"
+                    className="p-3 bg-red-500 text-white rounded-2xl hover:scale-110 active:scale-95 transition-all shadow-xl"
                   >
-                    <Trash2 className="w-5 h-5" />
+                    <Trash2 className="w-6 h-6" />
                   </button>
                 </div>
-                <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                <div className="absolute top-4 left-4 bg-white/95 backdrop-blur px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl border border-white/20">
                   Page {idx + 1}
                 </div>
               </motion.div>
             ))}
           </AnimatePresence>
-          <button
-            onClick={() => {}} // This is handled by a hidden input in Dropzone usually, let's just use the Dropzone as a card
-            className="aspect-[3/4] border-2 border-dashed border-surface-border rounded-2xl flex flex-col items-center justify-center gap-2 text-brand-secondary hover:border-brand-accent hover:text-brand-accent hover:bg-blue-50 transition-all"
-          >
+          
+          <div className="aspect-[3/4] rounded-3xl overflow-hidden relative border-2 border-dashed border-gray-200 hover:border-brand-accent hover:bg-blue-50/50 transition-all group p-1">
             <Dropzone 
                onFilesAdded={onFilesAdded} 
                accept={{ 'image/*': ['.png', '.jpg', '.jpeg'] }}
-               label="Add more"
+               mini
             />
-          </button>
+          </div>
         </div>
       )}
     </div>
