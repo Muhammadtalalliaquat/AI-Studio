@@ -11,15 +11,12 @@ import {
   Baseline, 
   Bold, 
   Palette,
-  X,
   Trash2,
   MousePointer,
-  RotateCcw,
   Square,
   Loader2,
   Check,
   Plus,
-  GripHorizontal,
   Hand
 } from 'lucide-react';
 import Dropzone from './Dropzone';
@@ -629,64 +626,6 @@ export default function PdfEditor() {
               </div>
             </div>
 
-            {/* Layer Tree */}
-            <div className="bg-white p-6 md:p-8 rounded-3xl md:rounded-[3.5rem] border border-surface-border shadow-sm flex-1 flex flex-col min-h-[300px]">
-               <h3 className="font-black text-[10px] md:text-[11px] uppercase tracking-[0.3em] text-brand-secondary mb-6 md:mb-8 flex items-center justify-between">
-                Project Layers
-                <span className="bg-gray-50 px-3 md:px-4 py-1 md:py-1.5 rounded-full text-[10px] md:text-[11px] font-mono border border-gray-100 shadow-inner">{annotations.length}</span>
-              </h3>
-              
-              <div className="space-y-4 overflow-y-auto flex-1 pr-1 custom-scrollbar">
-                {annotations.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center opacity-20 grayscale py-20 text-center">
-                     <Plus className="w-16 h-16 mb-6 text-brand-secondary" />
-                     <p className="text-[12px] font-black uppercase tracking-[0.2em] text-brand-secondary">Workspace Empty</p>
-                     <p className="text-[10px] mt-3 font-medium text-brand-secondary leading-relaxed">Begin clicking on document<br/>to place your annotations.</p>
-                  </div>
-                ) : (
-                  annotations.map(anno => (
-                    <div 
-                      key={anno.id} 
-                      className={`p-6 rounded-[2.5rem] border transition-all flex items-center gap-5 group cursor-pointer ${anno.pageIndex === pageNumber - 1 ? 'bg-blue-50 border-blue-100 shadow-sm' : 'bg-white border-transparent opacity-40 grayscale hover:opacity-70'}`}
-                      onClick={() => {
-                        if (anno.pageIndex !== pageNumber - 1) {
-                          setPageNumber(anno.pageIndex + 1);
-                        }
-                        setEditingId(anno.id);
-                        setEditingText(anno.text);
-                      }}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-black text-brand-primary truncate leading-tight uppercase tracking-tight">{anno.text || 'Draft Annotation'}</p>
-                        <div className="flex items-center gap-3 mt-2">
-                           <span className="text-[9px] font-black uppercase text-gray-400">Sheet {anno.pageIndex + 1}</span>
-                           <span className="text-[9px] font-black uppercase text-gray-400">•</span>
-                           <span className="text-[9px] font-black uppercase text-gray-400">{anno.fontSize}pt</span>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteAnnotation(anno.id);
-                        }}
-                        className="p-3 bg-white text-red-500 hover:bg-red-500 hover:text-white rounded-2xl transition-all shadow-sm border border-gray-100"
-                      >
-                        <Trash2 className="w-5 h-5 pointer-events-none" />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-
-               {annotations.length > 0 && (
-                 <button 
-                  onClick={() => { if(confirm("Discard all mult-layer architectural progress?")) setAnnotations([]); }}
-                  className="mt-8 w-full py-6 text-[11px] font-black text-red-500 hover:bg-red-50 rounded-[3.5rem] transition-all flex items-center justify-center gap-4 border-2 border-dashed border-red-100 group"
-                >
-                  <RotateCcw className="w-5 h-5 group-hover:rotate-180 transition-transform duration-700" /> RESET WORKSPACE
-                </button>
-               )}
-            </div>
           </div>
         </div>
       )}
